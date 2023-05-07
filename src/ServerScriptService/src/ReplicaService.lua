@@ -127,9 +127,7 @@
 		
 --]]
 
-local SETTINGS = {
-
-}
+local SETTINGS = {}
 
 local Madwork -- Standalone Madwork reference for portable version of ReplicaService/ReplicaController
 do
@@ -146,11 +144,23 @@ do
 				end
 			end)
 			while instance == nil do
-				if start_time ~= nil and os.clock() - start_time > 1
-					and (RunService:IsServer() == true or game:IsLoaded() == true) then
+				if
+					start_time ~= nil
+					and os.clock() - start_time > 1
+					and (RunService:IsServer() == true or game:IsLoaded() == true)
+				then
 					start_time = nil
-					warn("[" .. script.Name .. "]: Missing " .. warn_name .. " \"" .. instance_name
-						.. "\" in " .. ancestor:GetFullName() .. "; Please check setup documentation")
+					warn(
+						"["
+							.. script.Name
+							.. "]: Missing "
+							.. warn_name
+							.. ' "'
+							.. instance_name
+							.. '" in '
+							.. ancestor:GetFullName()
+							.. "; Please check setup documentation"
+					)
 				end
 				task.wait()
 			end
@@ -171,13 +181,6 @@ do
 	end
 
 	Madwork = {
-		GetShared = function(package_name, item_name)
-			-- Ignoring package_name as we're working without Madwork framework
-			return WaitForDescendant(game:GetService("ReplicatedStorage"), item_name, "module")
-		end,
-		GetModule = function(package_name, module_name)
-			return WaitForDescendant(game:GetService("ServerScriptService"), module_name, "module")
-		end,
 		SetupRemoteEvent = function(remote_name)
 			if RunService:IsServer() == true then
 				local remote_event = Instance.new("RemoteEvent")
@@ -188,10 +191,9 @@ do
 				return WaitForDescendant(RemoteEventContainer, remote_name, "remote event")
 			end
 		end,
-		Shared = {}, -- A Madwork package reference - ReplicaService will try to check this table
 	}
 
-	local MadworkScriptSignal = require(Madwork.GetShared("Madwork", "MadworkScriptSignal"))
+	local MadworkScriptSignal = require(script.Parent.MadworkScriptSignal)
 	Madwork.NewScriptSignal = MadworkScriptSignal.NewScriptSignal
 	Madwork.NewArrayScriptConnection = MadworkScriptSignal.NewArrayScriptConnection
 end
@@ -203,7 +205,7 @@ local ReplicaService = {
 	ActivePlayers = {}, -- {Player = true, ...}
 	NewActivePlayerSignal = Madwork.NewScriptSignal(), -- (player)
 	RemovedActivePlayerSignal = Madwork.NewScriptSignal(), -- (player)
-	
+
 	PlayerRequestedData = Madwork.NewScriptSignal(), -- (player)
 
 	_replicas = {
@@ -245,13 +247,13 @@ local ReplicaService = {
 	},
 
 	_replica_class = nil, -- Injection hook
-
 }
 
 ----- Loaded Services & Modules -----
 
-local RateLimiter = require(Madwork.GetShared("Madwork", "RateLimiter"))
-local MadworkMaid = require(Madwork.GetShared("Madwork", "MadworkMaid"))
+local RateLimiter = require(script.Parent.RateLimiter)
+local MadworkMaid = require(script.Parent.MadworkMaid)
+local Network = _G.Require("Network")
 
 ----- Private Variables -----
 
@@ -264,18 +266,18 @@ local ActivePlayers = ReplicaService.ActivePlayers
 local Replicas = ReplicaService._replicas
 local TopLevelReplicas = ReplicaService._top_level_replicas
 
-local rev_ReplicaRequestData = Madwork.SetupRemoteEvent("Replica_ReplicaRequestData")   -- Fired client-side when the client loads for the first time
+local rev_ReplicaRequestData = "Replica_ReplicaRequestData" -- Fired client-side when the client loads for the first time
 
-local rev_ReplicaSetValue = Madwork.SetupRemoteEvent("Replica_ReplicaSetValue")         -- (replica_id, {path}, value)
-local rev_ReplicaSetValues = Madwork.SetupRemoteEvent("Replica_ReplicaSetValues")       -- (replica_id, {path}, {values})
-local rev_ReplicaArrayInsert = Madwork.SetupRemoteEvent("Replica_ReplicaArrayInsert")   -- (replica_id, {path}, value)
-local rev_ReplicaArraySet = Madwork.SetupRemoteEvent("Replica_ReplicaArraySet")         -- (replica_id, {path}, index, value)
-local rev_ReplicaArrayRemove = Madwork.SetupRemoteEvent("Replica_ReplicaArrayRemove")   -- (replica_id, {path}, index)
-local rev_ReplicaWrite = Madwork.SetupRemoteEvent("Replica_ReplicaWrite")               -- (replica_id, func_id, params...)
-local rev_ReplicaSignal = Madwork.SetupRemoteEvent("Replica_ReplicaSignal")             -- (replica_id, params...)
-local rev_ReplicaSetParent = Madwork.SetupRemoteEvent("Replica_ReplicaSetParent")       -- (replica_id, parent_replica_id)
-local rev_ReplicaCreate = Madwork.SetupRemoteEvent("Replica_ReplicaCreate")             -- (replica_id, {replica_data}) OR (top_replica_id, {creation_data}) or ({replica_package})
-local rev_ReplicaDestroy = Madwork.SetupRemoteEvent("Replica_ReplicaDestroy")           -- (replica_id)
+local rev_ReplicaSetValue = "Replica_ReplicaSetValue" -- (replica_id, {path}, value)
+local rev_ReplicaSetValues = "Replica_ReplicaSetValues" -- (replica_id, {path}, {values})
+local rev_ReplicaArrayInsert = "Replica_ReplicaArrayInsert" -- (replica_id, {path}, value)
+local rev_ReplicaArraySet = "Replica_ReplicaArraySet" -- (replica_id, {path}, index, value)
+local rev_ReplicaArrayRemove = "Replica_ReplicaArrayRemove" -- (replica_id, {path}, index)
+local rev_ReplicaWrite = "Replica_ReplicaWrite" -- (replica_id, func_id, params...)
+local rev_ReplicaSignal = "Replica_ReplicaSignal" -- (replica_id, params...)
+local rev_ReplicaSetParent = "Replica_ReplicaSetParent" -- (replica_id, parent_replica_id)
+local rev_ReplicaCreate = "Replica_ReplicaCreate" -- (replica_id, {replica_data}) OR (top_replica_id, {creation_data}) or ({replica_package})
+local rev_ReplicaDestroy = "Replica_ReplicaDestroy" -- (replica_id)
 
 local ReplicaIndex = 0
 
@@ -303,9 +305,17 @@ local function GetWriteLibFunctionsRecursive(list_table, pointer, name_stack)
 		if type(value) == "table" then
 			GetWriteLibFunctionsRecursive(list_table, value, name_stack .. key .. ".")
 		elseif type(value) == "function" then
-			table.insert(list_table, {name_stack .. key, value})
+			table.insert(list_table, { name_stack .. key, value })
 		else
-			error("[ReplicaService]: Invalid write function value \"" .. tostring(value) .. "\" (" .. typeof(value) .. "); name_stack = \"" .. name_stack .. "\"")
+			error(
+				'[ReplicaService]: Invalid write function value "'
+					.. tostring(value)
+					.. '" ('
+					.. typeof(value)
+					.. '); name_stack = "'
+					.. name_stack
+					.. '"'
+			)
 		end
 	end
 end
@@ -321,16 +331,7 @@ local function LoadWriteLib(write_lib_module)
 	end
 
 	if write_lib_module:IsDescendantOf(ReplicatedStorage) == false then
-		local found_in_shared = false
-		for _, dir in pairs(Madwork.Shared) do
-			if write_lib_module:IsDescendantOf(dir) == true then
-				found_in_shared = true
-				break
-			end
-		end
-		if found_in_shared == false then
-			error("[ReplicaService]: Write library module must be a descendant of ReplicatedStorage or \"Shared\" directory")
-		end
+		error('[ReplicaService]: Write library module must be a descendant of ReplicatedStorage or "Shared" directory')
 	end
 
 	local write_lib_raw = require(write_lib_module)
@@ -348,7 +349,7 @@ local function LoadWriteLib(write_lib_module)
 	local write_lib = {} -- {["function_name"] = {func_id, function}, ...}
 
 	for func_id, func_params in ipairs(function_list) do
-		write_lib[func_params[1]] = {func_id, func_params[2]}
+		write_lib[func_params[1]] = { func_id, func_params[2] }
 	end
 
 	LoadedWriteLibs[write_lib_module] = write_lib
@@ -414,11 +415,11 @@ function Replica:SetValue(path, value)
 		local id = self.Id
 		if self._replication["All"] == true then
 			for player in pairs(ActivePlayers) do
-				rev_ReplicaSetValue:FireClient(player, id, path_array, value)
+				Network:FireClient(player, rev_ReplicaSetValue, id, path_array, value)
 			end
 		else
 			for player in pairs(self._replication) do
-				rev_ReplicaSetValue:FireClient(player, id, path_array, value)
+				Network:FireClient(player, rev_ReplicaSetValue, id, path_array, value)
 			end
 		end
 	end
@@ -439,11 +440,11 @@ function Replica:SetValues(path, values)
 		local id = self.Id
 		if self._replication["All"] == true then
 			for player in pairs(ActivePlayers) do
-				rev_ReplicaSetValues:FireClient(player, id, path_array, values)
+				Network:FireClient(player, rev_ReplicaSetValues, id, path_array, values)
 			end
 		else
 			for player in pairs(self._replication) do
-				rev_ReplicaSetValues:FireClient(player, id, path_array, values)
+				Network:FireClient(player, rev_ReplicaSetValues, id, path_array, values)
 			end
 		end
 	end
@@ -463,11 +464,11 @@ function Replica:ArrayInsert(path, value) --> new_index
 		local id = self.Id
 		if self._replication["All"] == true then
 			for player in pairs(ActivePlayers) do
-				rev_ReplicaArrayInsert:FireClient(player, id, path_array, value)
+				Network:FireClient(player, rev_ReplicaArrayInsert, id, path_array, value)
 			end
 		else
 			for player in pairs(self._replication) do
-				rev_ReplicaArrayInsert:FireClient(player, id, path_array, value)
+				Network:FireClient(player, rev_ReplicaArrayInsert, id, path_array, value)
 			end
 		end
 	end
@@ -491,11 +492,11 @@ function Replica:ArraySet(path, index, value)
 		local id = self.Id
 		if self._replication["All"] == true then
 			for player in pairs(ActivePlayers) do
-				rev_ReplicaArraySet:FireClient(player, id, path_array, index, value)
+				Network:FireClient(player, rev_ReplicaArraySet, id, path_array, index, value)
 			end
 		else
 			for player in pairs(self._replication) do
-				rev_ReplicaArraySet:FireClient(player, id, path_array, index, value)
+				Network:FireClient(player, rev_ReplicaArraySet, id, path_array, index, value)
 			end
 		end
 	end
@@ -514,11 +515,11 @@ function Replica:ArrayRemove(path, index) --> removed_value
 		local id = self.Id
 		if self._replication["All"] == true then
 			for player in pairs(ActivePlayers) do
-				rev_ReplicaArrayRemove:FireClient(player, id, path_array, index)
+				Network:FireClient(player, rev_ReplicaArrayRemove, id, path_array, index)
 			end
 		else
 			for player in pairs(self._replication) do
-				rev_ReplicaArrayRemove:FireClient(player, id, path_array, index)
+				Network:FireClient(player, rev_ReplicaArrayRemove, id, path_array, index)
 			end
 		end
 	end
@@ -539,11 +540,11 @@ function Replica:Write(function_name, ...) --> return_params...
 	local func_id = self._write_lib[function_name][1]
 	if self._replication["All"] == true then
 		for player in pairs(ActivePlayers) do
-			rev_ReplicaWrite:FireClient(player, id, func_id, ...)
+			Network:FireClient(player, rev_ReplicaWrite, id, func_id, ...)
 		end
 	else
 		for player in pairs(self._replication) do
-			rev_ReplicaWrite:FireClient(player, id, func_id, ...)
+			Network:FireClient(player, rev_ReplicaWrite, id, func_id, ...)
 		end
 	end
 	return table.unpack(return_params)
@@ -559,9 +560,8 @@ function Replica:ConnectOnServerEvent(listener) --> [ScriptConnection]
 end
 
 function Replica:FireClient(player, ...)
-	if (self._replication["All"] == true and ActivePlayers[player] == true)
-		or self._replication[player] ~= nil then
-		rev_ReplicaSignal:FireClient(player, self.Id, ...)
+	if (self._replication["All"] == true and ActivePlayers[player] == true) or self._replication[player] ~= nil then
+		Network:FireClient(player, rev_ReplicaSignal, self.Id, ...)
 	end
 end
 
@@ -569,11 +569,11 @@ function Replica:FireAllClients(...)
 	local id = self.Id
 	if self._replication["All"] == true then
 		for player in pairs(ActivePlayers) do
-			rev_ReplicaSignal:FireClient(player, id, ...)
+			Network:FireClient(player, rev_ReplicaSignal, id, ...)
 		end
 	else
 		for player in pairs(self._replication) do
-			rev_ReplicaSignal:FireClient(player, id, ...)
+			Network:FireClient(player, rev_ReplicaSignal, id, ...)
 		end
 	end
 end
@@ -629,8 +629,11 @@ function Replica:SetParent(new_parent)
 			no_replication_check = old_replication
 		end
 		for player in pairs(no_replication_check) do
-			if (old_replication[player] == true or old_replication.All == true) and (new_replication[player] == true or new_replication.All == true) then
-				rev_ReplicaSetParent:FireClient(player, replica_id, new_parent.Id)
+			if
+				(old_replication[player] == true or old_replication.All == true)
+				and (new_replication[player] == true or new_replication.All == true)
+			then
+				Network:FireClient(player, rev_ReplicaSetParent, replica_id, new_parent.Id)
 			end
 		end
 		-- 2) Create for clients that have the new parent replica, but not the old parent replica
@@ -651,20 +654,20 @@ function Replica:SetParent(new_parent)
 			end
 		end
 		for player in pairs(replicate_for_players) do
-			rev_ReplicaCreate:FireClient(player, replica_id, temporary_creation_data)
+			Network:FireClient(player, rev_ReplicaCreate, replica_id, temporary_creation_data)
 		end
 		-- 3) Destroy for clients that do not have the new parent replica
 		if new_replication.All ~= true then
 			if old_replication.All ~= true then
 				for player in pairs(old_replication) do
 					if new_replication[player] ~= true then
-						rev_ReplicaDestroy:FireClient(player, replica_id)
+						Network:FireClient(player, rev_ReplicaDestroy, replica_id)
 					end
 				end
 			else
 				for player in pairs(ActivePlayers) do
 					if new_replication[player] ~= true then
-						rev_ReplicaDestroy:FireClient(player, replica_id)
+						Network:FireClient(player, rev_ReplicaDestroy, replica_id)
 					end
 				end
 			end
@@ -673,11 +676,11 @@ function Replica:SetParent(new_parent)
 		self._creation_data[tostring(replica_id)][4] = new_parent.Id
 		if old_replication.All == true then
 			for player in pairs(ActivePlayers) do
-				rev_ReplicaSetParent:FireClient(player, replica_id, new_parent.Id)
+				Network:FireClient(player, rev_ReplicaSetParent, replica_id, new_parent.Id)
 			end
 		else
 			for player in pairs(old_replication) do
-				rev_ReplicaSetParent:FireClient(player, replica_id, new_parent.Id)
+				Network:FireClient(player, rev_ReplicaSetParent, replica_id, new_parent.Id)
 			end
 		end
 	end
@@ -700,7 +703,7 @@ function Replica:ReplicateFor(param)
 			local id = self.Id
 			for player in pairs(ActivePlayers) do
 				if replication[player] == nil then
-					rev_ReplicaCreate:FireClient(player, id, self._creation_data)
+					Network:FireClient(player, rev_ReplicaCreate, id, self._creation_data)
 				end
 			end
 			-- Clear selective replication settings:
@@ -716,7 +719,7 @@ function Replica:ReplicateFor(param)
 			if replication[param] == nil then
 				-- Create replica for client:
 				replication[param] = true
-				rev_ReplicaCreate:FireClient(param, self.Id, self._creation_data)
+				Network:FireClient(param, rev_ReplicaCreate, self.Id, self._creation_data)
 			end
 		elseif typeof(param) == "Instance" then
 			if param.ClassName ~= "Player" then
@@ -726,7 +729,9 @@ function Replica:ReplicateFor(param)
 		end
 	else
 		if param ~= "All" then
-			error("[ReplicaService]: Don't selectively replicate for clients when replica is replicated to All - :DestroyFor(\"All\") first")
+			error(
+				'[ReplicaService]: Don\'t selectively replicate for clients when replica is replicated to All - :DestroyFor("All") first'
+			)
 		end
 	end
 end
@@ -743,20 +748,20 @@ function Replica:DestroyFor(param)
 	if replication[param] ~= nil and ActivePlayers[param] == true then
 		-- Destroy replica for client:
 		replication[param] = nil
-		rev_ReplicaDestroy:FireClient(param, self.Id)
+		Network:FireClient(param, rev_ReplicaDestroy, self.Id)
 	elseif param == "All" then
 		local id = self.Id
 		if replication["All"] == true then
 			-- Destroy replica for all active clients:
 			replication["All"] = nil
 			for player in pairs(ActivePlayers) do
-				rev_ReplicaDestroy:FireClient(player, id)
+				Network:FireClient(player, rev_ReplicaDestroy, id)
 			end
 		else
 			-- Destroy replica for all clients who were replicated to:
 			for player in pairs(replication) do
 				replication[player] = nil
-				rev_ReplicaDestroy:FireClient(player, id)
+				Network:FireClient(player, rev_ReplicaDestroy, id)
 			end
 		end
 	elseif replication["All"] == true then -- Don't do this
@@ -801,11 +806,11 @@ function Replica:Destroy()
 	end
 	if self._replication["All"] == true then
 		for player in pairs(ActivePlayers) do
-			rev_ReplicaDestroy:FireClient(player, id)
+			Network:FireClient(player, rev_ReplicaDestroy, id)
 		end
 	else
 		for player in pairs(self._replication) do
-			rev_ReplicaDestroy:FireClient(player, id)
+			Network:FireClient(player, rev_ReplicaDestroy, id)
 		end
 	end
 	-- Recursive destruction
@@ -819,11 +824,11 @@ function ReplicaService.NewClassToken(class_name) --> [ReplicaClassToken]
 		error("[ReplicaService]: class_name must be a string")
 	end
 	if CreatedClassTokens[class_name] == true then
-		error("[ReplicaService]: Token for replica class \"" .. class_name .. "\" was already created")
+		error('[ReplicaService]: Token for replica class "' .. class_name .. '" was already created')
 	end
 	CreatedClassTokens[class_name] = true
 	return {
-		Class = class_name
+		Class = class_name,
 	}
 end
 
@@ -868,7 +873,7 @@ function ReplicaService.NewReplica(replica_params) --> [Replica]
 		-- Parsing replica_params.Replication:
 		if type(replication_settings) == "table" then -- Must be a player list {player = true, ...} OR an empty table {}
 			if replication_settings["All"] ~= nil then
-				error("[ReplicaService]: To replicate replica to all, do replica_params.Replication = \"All\"")
+				error('[ReplicaService]: To replicate replica to all, do replica_params.Replication = "All"')
 			end
 			replication = {}
 			pending_replication = {}
@@ -883,22 +888,26 @@ function ReplicaService.NewReplica(replica_params) --> [Replica]
 				end
 			end
 		elseif replication_settings == "All" then
-			replication = {["All"] = true}
+			replication = { ["All"] = true }
 			pending_replication = {}
 		elseif typeof(replication_settings) == "Instance" then -- Must be a player
 			if replication_settings.ClassName == "Player" then
 				if ActivePlayers[replication_settings] == true then
-					replication = {[replication_settings] = true}
+					replication = { [replication_settings] = true }
 					pending_replication = {}
 				else
 					replication = {}
-					pending_replication = {[replication_settings] = true}
+					pending_replication = { [replication_settings] = true }
 				end
 			else
 				error("[ReplicaService]: Invalid value for param1")
 			end
 		else
-			error("[ReplicaService]: Invalid value for replica_params.Replication (" .. tostring(replication_settings) .. ")")
+			error(
+				"[ReplicaService]: Invalid value for replica_params.Replication ("
+					.. tostring(replication_settings)
+					.. ")"
+			)
 		end
 	end
 
@@ -917,7 +926,8 @@ function ReplicaService.NewReplica(replica_params) --> [Replica]
 		creation_data = {}
 	end
 
-	local creation_data_of_one = {replica_class, replica_tags, data_table, (parent ~= nil) and parent.Id or 0, replica_params.WriteLib}
+	local creation_data_of_one =
+		{ replica_class, replica_tags, data_table, (parent ~= nil) and parent.Id or 0, replica_params.WriteLib }
 	creation_data[tostring(ReplicaIndex)] = creation_data_of_one
 
 	-- New Replica object table:
@@ -947,11 +957,11 @@ function ReplicaService.NewReplica(replica_params) --> [Replica]
 	-- Replicating new replica:
 	if replication["All"] == true then
 		for player in pairs(ActivePlayers) do
-			rev_ReplicaCreate:FireClient(player, ReplicaIndex, creation_data_of_one)
+			Network:FireClient(player, rev_ReplicaCreate, ReplicaIndex, creation_data_of_one)
 		end
 	else
 		for player in pairs(replication) do
-			rev_ReplicaCreate:FireClient(player, ReplicaIndex, creation_data_of_one)
+			Network:FireClient(player, rev_ReplicaCreate, ReplicaIndex, creation_data_of_one)
 		end
 	end
 
@@ -987,7 +997,12 @@ do
 				LockReplicaMethods[method_name] = func
 			else
 				LockReplicaMethods[method_name] = function(self)
-					error("[ReplicaService]: Tried to call method \"" .. method_name .. "\" for a destroyed replica; " .. self:Identify())
+					error(
+						'[ReplicaService]: Tried to call method "'
+							.. method_name
+							.. '" for a destroyed replica; '
+							.. self:Identify()
+					)
 				end
 			end
 		end
@@ -1002,55 +1017,61 @@ ReplicaService.Temporary = ReplicaService.NewReplica({
 ----- Connections -----
 
 -- New player data replication:
-rev_ReplicaRequestData.OnServerEvent:Connect(function(player)
-	if ActivePlayers[player] ~= nil then
-		return
-	end
-	
-	-- Provide the client with first server time reference:
-	ReplicaService.PlayerRequestedData:Fire(player)
 
-	-- Move player from pending replication to active replication
-	for replica_id, replica in pairs(TopLevelReplicas) do
-		if replica._pending_replication[player] ~= nil then
-			replica._pending_replication[player] = nil
-			replica._replication[player] = true
+Network:BindEvents({
+	[rev_ReplicaRequestData] = function(player)
+		if ActivePlayers[player] ~= nil then
+			return
 		end
-	end
-	-- Make the client create all replicas that are initially replicated to the client;
-	-- Pack up and send intially replicated replicas:
-	local replica_package = {} -- {replica_id, creation_data}
-	for replica_id, replica in pairs(TopLevelReplicas) do
-		if replica._replication[player] ~= nil or replica._replication["All"] == true then
-			table.insert(replica_package, {replica_id, replica._creation_data})
-		end
-	end
-	rev_ReplicaCreate:FireClient(player, replica_package)
-	-- Let the client know that all replica data has been sent:
-	rev_ReplicaRequestData:FireClient(player)
-	-- Set player to active:
-	ActivePlayers[player] = true
-	ReplicaService.NewActivePlayerSignal:Fire(player)
-end)
 
--- Client-invoked replica signals:
-rev_ReplicaSignal.OnServerEvent:Connect(function(player, replica_id, ...)
-	-- Missing player prevention, spam prevention and exploit prevention:
-	if ActivePlayers[player] == nil or DefaultRateLimiter:CheckRate(player) == false
-		or type(replica_id) ~= "number" then
-		return
-	end
+		-- Provide the client with first server time reference:
+		ReplicaService.PlayerRequestedData:Fire(player)
 
-	local replica = Replicas[replica_id]
-	if replica ~= nil then
-		if replica._replication[player] ~= nil or replica._replication["All"] == true then
-			local signal_listeners = replica._signal_listeners
-			for i = 1, #signal_listeners do
-				signal_listeners[i](player, ...)
+		-- Move player from pending replication to active replication
+		for replica_id, replica in pairs(TopLevelReplicas) do
+			if replica._pending_replication[player] ~= nil then
+				replica._pending_replication[player] = nil
+				replica._replication[player] = true
 			end
 		end
-	end
-end)
+		-- Make the client create all replicas that are initially replicated to the client;
+		-- Pack up and send intially replicated replicas:
+		local replica_package = {} -- {replica_id, creation_data}
+		for replica_id, replica in pairs(TopLevelReplicas) do
+			if replica._replication[player] ~= nil or replica._replication["All"] == true then
+				table.insert(replica_package, { replica_id, replica._creation_data })
+			end
+		end
+		Network:FireClient(player, rev_ReplicaCreate, replica_package)
+		-- Let the client know that all replica data has been sent:
+		Network:FireClient(player, rev_ReplicaRequestData)
+		-- Set player to active:
+		ActivePlayers[player] = true
+		ReplicaService.NewActivePlayerSignal:Fire(player)
+	end,
+
+	-- Client-invoked replica signals:
+	[rev_ReplicaSignal] = function(player, replica_id, ...)
+		-- Missing player prevention, spam prevention and exploit prevention:
+		if
+			ActivePlayers[player] == nil
+			or DefaultRateLimiter:CheckRate(player) == false
+			or type(replica_id) ~= "number"
+		then
+			return
+		end
+
+		local replica = Replicas[replica_id]
+		if replica ~= nil then
+			if replica._replication[player] ~= nil or replica._replication["All"] == true then
+				local signal_listeners = replica._signal_listeners
+				for i = 1, #signal_listeners do
+					signal_listeners[i](player, ...)
+				end
+			end
+		end
+	end,
+})
 
 -- Player leave handling:
 Players.PlayerRemoving:Connect(function(player)

@@ -1,0 +1,3 @@
+std = "customstd"
+[lints]
+global_usage = "allow"

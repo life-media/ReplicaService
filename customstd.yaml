@@ -1,0 +1,7 @@
+---
+base: roblox
+name: customstd
+globals:
+  require:
+    args:
+      - type: string
